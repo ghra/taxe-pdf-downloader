@@ -17,3 +17,8 @@ Trzeba mieć konto w taxe.pl - o login i hasło skrypt pyta na starcie.
 
 Jeśli ktoś zechce dorobić archiwizację faktur lub pobieranie innych
 raportów - pull requesty mile widziane.
+
+Wymagania pakietów, na bazie ubuntu:
+```
+sudo apt-get install coreutils bash curl wkhtmltopdf
+```
