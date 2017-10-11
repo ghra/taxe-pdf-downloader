@@ -187,10 +187,10 @@ for name in "Sprzedaz" "Pozostale-zakupy" "Srodki-trwale"; do
 	rm -f "${filebase}.html"
 done
 
-do_request "/dev/null" "/kpir/" "dataOd:${YEAR_MONTH}"
+do_post "/dev/null" "/kpir/" "dataOd=${YEAR_MONTH}"
 do_request "$YEAR_MONTH taxe - KPiR.pdf" "/kpir/pdf"
 
-do_post "/dev/null" "/st/" "dataOd:${YEAR}-01-01"
+do_post "/dev/null" "/st/" "dataOd=${YEAR}-01-01"
 do_request "$YEAR_MONTH taxe - ewidencja srodkow trwalych.pdf" "/st/pdf"
 
 rm -f "${tmp_raporty_list}"
