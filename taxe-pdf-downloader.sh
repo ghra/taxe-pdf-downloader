@@ -112,11 +112,11 @@ do_login() {
 
 	do_request /dev/null "/"
 
-	post_data="email=${email}&haslo=${password}&fro=&zaloguj=Zaloguj+si%C4%99+%C2%BB"
+	post_data="dologin=1&email=${email}&password=${password}&redirect="
 	tmp_login_page=`mktemp`
-	do_post "$tmp_login_page" "/logowanie/" "$post_data"
+	do_post "$tmp_login_page" "/ajax_profil" "$post_data"
 
-	grep -q 'Nowy dokument sprzeda' "$tmp_login_page";
+	grep -q 'Zalogowano.' "$tmp_login_page";
 	res=$?
 
 	rm -f "$tmp_login_page"
@@ -126,11 +126,12 @@ do_login() {
 		echo "Logowanie niepoprawne..." >&2
 		exit
 	fi
+	do_request /dev/null "/panel/"
 }
 
 
 do_logout() {
-	do_request "/dev/null" "/logowanie/wyloguj/"
+	do_request "/dev/null" "/profile/logout"
 	rm -fv "$COOKIE_FILE"
 }
 
