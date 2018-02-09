@@ -164,6 +164,31 @@ do_login
 tmp_raporty_list=`mktemp`
 dates_data="dataOd=${FIRST_DAY}&dataDo=${LAST_DAY}"
 
+do_request "${tmp_raporty_list}" "/epp/"  # /epp/ = Ewidencja Przebiegu Pojazdow
+car_ids=`cat "${tmp_raporty_list}" | sed -n 's|^.*href="/epp/ewidencja/\([0-9]*\)/".*$|\1|p'`
+for car_id in $car_ids; do
+	html_url="/epp/ewidencja/${car_id}/${FIRST_DAY}/${LAST_DAY}/"
+	pdf_url="/epp/ewidencjaPDF/${car_id}/${FIRST_DAY}/${LAST_DAY}/"
+	do_request "${tmp_raporty_list}" "$html_url"
+	reg_number=`cat "${tmp_raporty_list}" | tr -d '\n' | sed 's/<tr>/\n/g' | sed 's/<[^>]*>/ /g' | grep -A 1 'Numer rejestracyjny' | tail -n 1 | cut -d '	' -f 2 | tr -d ' '`
+
+	output_name="$YEAR_MONTH taxe - Pojazd $reg_number (cide${car_id}) Ewidencja Przebiegu.pdf"
+	do_request "$output_name" "$pdf_url"
+done
+
+do_request "${tmp_raporty_list}" "/epp-koszty/0/"
+# input: <option value="244">PEUGEOTE 528 SW (WI 5931X)</option>
+# output: 244:WI5931X
+id2reg_list=`cat "${tmp_raporty_list}" | sed -n 's#<option value="\([0-9]*\)">[^(]*(\([A-Za-z0-9 ]*\))</option>#\n\1:\2\n#gp' | tr -d ' '`
+for id2reg in $id2reg_list; do
+	car_id=`echo "$id2reg" | cut -d ':' -f 1`
+	reg_number=`echo "$id2reg" | cut -d ':' -f 2`
+
+	do_post "/dev/null" "/epp-koszty/${car_id}/" "dataOd=${YEAR_MONTH}"
+	output_name="$YEAR_MONTH taxe - Pojazd $reg_number (cidc${car_id}) Ewidencja Kosztow.pdf"
+	do_request "$output_name" "/epp-koszty/${car_id}/pdf/"
+done
+
 do_request "${tmp_raporty_list}" "/raporty/wszystkie/?tab=all"
 for name in "PIT-5L" "VAT-7" "ZUS"; do
 	pdf_url=`cat ${tmp_raporty_list} | tr -d '\n' | sed 's/<h3/\n&/g' | sed -n "s#^.*\<${name}\>.*\<za:.*\<${YEAR_MONTH}\>.*\(/raporty/pdf/[0-9]*\).*\\$#\1#p"`
