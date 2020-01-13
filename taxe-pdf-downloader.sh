@@ -108,7 +108,7 @@ do_post_to_pdf() {
 
 do_login() {
 	read -p "Login/email: " email
-	read -p "Haslo: " -s password
+	read -p "Password: " -s password
 
 	do_request /dev/null "/"
 
@@ -121,9 +121,9 @@ do_login() {
 
 	rm -f "$tmp_login_page"
 	if [[ $res == 0 ]]; then
-		echo "Logowanie ok..." >&2
+		echo "Logged in..." >&2
 	else
-		echo "Logowanie niepoprawne..." >&2
+		echo "Logging failed..." >&2
 		exit
 	fi
 	do_request /dev/null "/panel/"
