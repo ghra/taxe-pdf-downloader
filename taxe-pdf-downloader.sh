@@ -163,7 +163,7 @@ do_login
 
 tmp_raporty_list=`mktemp`
 dates_data="dataOd=${FIRST_DAY}&dataDo=${LAST_DAY}"
-errors_str=""
+errors=()
 
 do_request "${tmp_raporty_list}" "/epp/"  # /epp/ = Ewidencja Przebiegu Pojazdow
 car_ids=`cat "${tmp_raporty_list}" | sed -n 's|^.*href="/epp/ewidencja/\([0-9]*\)/".*$|\1|p'`
@@ -195,7 +195,7 @@ for name in "PIT-5L" "VAT-7" "ZUS"; do
 	output_fname="$YEAR_MONTH taxe - Raport ${name}.pdf"
 	pdf_url=`cat ${tmp_raporty_list} | tr -d '\n' | sed 's/<h3/\n&/g' | sed -n "s#^.*\<${name}\>.*\<za:.*\<${YEAR_MONTH}\>.*\(/raporty/pdf/[0-9]*\).*\\$#\1#p"`
 	if [[ -z "${pdf_url}" ]]; then
-		errors_str+="'${output_fname}' FAILED: cannot find '${name}' id !\n"
+		errors+=("'${output_fname}' FAILED: cannot find '${name}' id !")
 		continue
 	fi
 	do_request "${output_fname}" "${pdf_url}"
@@ -208,7 +208,7 @@ for name in "Sprzedaz" "Pozostale-zakupy" "Srodki-trwale"; do
 	output_fname="${filebase}.pdf"
 	pdf_url=`cat "${tmp_raporty_list}" | tr -d '\n' | sed -n "s#^.*javascript:zmienZakladke('${name}'[, 0-9]*'\(/rejestryVAT/[0-9]*\)'.*\\$#\1#p"`
 	if [[ -z "${pdf_url}" ]]; then
-		errors_str+="'${output_fname}' FAILED: cannot find '${name}' id!"
+		errors+=("'${output_fname}' FAILED: cannot find '${name}' id!")
 		continue
 	fi
 	do_request "${filebase}.html" "${pdf_url}"
@@ -226,9 +226,11 @@ rm -f "${tmp_raporty_list}"
 
 do_logout
 
-if [[ -n "${errors_str}" ]]; then
-	echo "==== ERRORS FOUND ===="
-	echo "${errors_str}"
+if [[ -n "${errors}" ]]; then
+	echo "==== FOUND ${#errors[@]} ERRORS ===="
+	for err_str in "${errors[@]}"; do
+		echo "${err_str}"
+	done
 else
 	echo "==== DONE, no errors found ===="
 fi
