@@ -43,6 +43,10 @@ do_request() {
 	echo "CURL: path/query: $path_query" >&2
 	echo "CURL: outfile: $out_file" >&2
 
+	if test -f "$out_file"; then
+		rm "$out_file"
+	fi
+
 	curl \
 		--silent \
 		"${BASE_URL}${path_query}" \
@@ -136,6 +140,16 @@ do_logout() {
 }
 
 
+function assert_file_is_pdf () {
+	path=$1
+	full_ctype=`file -i -b "$path"`  # eg: "application/pdf; charset=binary"
+	ctype=`echo "$full_ctype" | cut -d ';' -f 1`
+	if [[ "$ctype" != "application/pdf" ]]; then
+		errors+=("'$path' FAILED: file is not PDF, found content type='$full_ctype'")
+	fi
+}
+
+
 show_usage_and_exit() {
 	echo "Usage: `basename $1` <YYYY-mm>" >&2
 	echo "Will ask for username/password for taxe.pl service." >&2
@@ -162,8 +176,9 @@ check_system_requirements
 do_login
 
 tmp_raporty_list=`mktemp`
-dates_data="dataOd=${FIRST_DAY}&dataDo=${LAST_DAY}"
+dates_from_to="dataOd=${FIRST_DAY}&dataDo=${LAST_DAY}"
 errors=()
+
 
 do_request "${tmp_raporty_list}" "/epp/"  # /epp/ = Ewidencja Przebiegu Pojazdow
 car_ids=`cat "${tmp_raporty_list}" | sed -n 's|^.*href="/epp/ewidencja/\([0-9]*\)/".*$|\1|p'`
@@ -173,8 +188,9 @@ for car_id in $car_ids; do
 	do_request "${tmp_raporty_list}" "$html_url"
 	reg_number=`cat "${tmp_raporty_list}" | tr -d '\n' | sed 's/<tr>/\n/g' | sed 's/<[^>]*>/ /g' | grep -A 1 'Numer rejestracyjny' | tail -n 1 | cut -d '	' -f 2 | tr -d ' '`
 
-	output_name="$YEAR_MONTH taxe - Pojazd $reg_number (cide${car_id}) Ewidencja Przebiegu.pdf"
-	do_request "$output_name" "$pdf_url"
+	output_fname="$YEAR_MONTH taxe - Pojazd $reg_number (cide${car_id}) Ewidencja Przebiegu.pdf"
+	do_request "$output_fname" "$pdf_url"
+	assert_file_is_pdf "$output_fname"
 done
 
 do_request "${tmp_raporty_list}" "/epp-koszty/0/"
@@ -186,8 +202,9 @@ for id2reg in $id2reg_list; do
 	reg_number=`echo "$id2reg" | cut -d ':' -f 2`
 
 	do_post "/dev/null" "/epp-koszty/${car_id}/" "dataOd=${YEAR_MONTH}"
-	output_name="$YEAR_MONTH taxe - Pojazd $reg_number (cidc${car_id}) Ewidencja Kosztow.pdf"
-	do_request "$output_name" "/epp-koszty/${car_id}/pdf/"
+	output_fname="$YEAR_MONTH taxe - Pojazd $reg_number (cidc${car_id}) Ewidencja Kosztow.pdf"
+	do_request "$output_fname" "/epp-koszty/${car_id}/pdf/"
+	assert_file_is_pdf "$output_fname"
 done
 
 do_request "${tmp_raporty_list}" "/raporty/wszystkie/?tab=all"
@@ -199,30 +216,35 @@ for name in "PIT-5L" "VAT-7" "ZUS"; do
 		continue
 	fi
 	do_request "${output_fname}" "${pdf_url}"
+	assert_file_is_pdf "$output_fname"
 done
 
-do_post "/dev/null" "/rejestryVAT/" "${dates_data}"
-do_request "${tmp_raporty_list}" "/rejestryVAT/"
-for name in "Sprzedaz" "Pozostale-zakupy" "Srodki-trwale"; do
-	filebase="$YEAR_MONTH taxe - VAT ${name}"
-	output_fname="${filebase}.pdf"
-	pdf_url=`cat "${tmp_raporty_list}" | tr -d '\n' | sed -n "s#^.*javascript:zmienZakladke('${name}'[, 0-9]*'\(/rejestryVAT/[0-9]*\)'.*\\$#\1#p"`
-	if [[ -z "${pdf_url}" ]]; then
-		errors+=("'${output_fname}' FAILED: cannot find '${name}' id!")
-		continue
-	fi
-	do_request "${filebase}.html" "${pdf_url}"
-	convert_html_to_pdf "${filebase}.html" "${output_fname}"
-	rm -f "${filebase}.html"
-done
+output_fname="$YEAR_MONTH taxe - VAT Sprzedaz.pdf"
+do_post "/dev/null" "/rejestryVAT/" "${dates_from_to}"
+do_request "$output_fname" "/rejestryVAT/sprzedaz/pdf"
+assert_file_is_pdf "$output_fname"
 
-do_post "/dev/null" "/kpir/" "dataOd=${YEAR_MONTH}"
-do_request "$YEAR_MONTH taxe - KPiR.pdf" "/kpir/pdf"
+output_fname="$YEAR_MONTH taxe - VAT Zakupy.pdf"
+do_post "/dev/null" "/rejestryVAT/" "${dates_from_to}"
+do_request "$output_fname" "/rejestryVAT/zakupy/pdf"
+assert_file_is_pdf "$output_fname"
 
+output_fname="$YEAR_MONTH taxe - VAT Srodki-trwale.pdf"
 do_post "/dev/null" "/st/" "dataOd=${YEAR}-01-01"
-do_request "$YEAR_MONTH taxe - ewidencja srodkow trwalych.pdf" "/st/pdf"
+do_request "$output_fname" "/st/pdf"
+assert_file_is_pdf "$output_fname"
 
-rm -f "${tmp_raporty_list}"
+output_fname="$YEAR_MONTH taxe - KPiR.pdf"
+do_post "/dev/null" "/kpir/" "dataOd=${YEAR_MONTH}"
+do_request "$output_fname" "/kpir/pdf"
+assert_file_is_pdf "$output_fname"
+
+output_fname="$YEAR_MONTH taxe - ewidencja srodkow trwalych.pdf"
+do_post "/dev/null" "/st/" "dataOd=${YEAR}-01-01"
+do_request "$output_fname" "/st/pdf"
+assert_file_is_pdf "$output_fname"
+
+#rm -f "${tmp_raporty_list}"
 
 do_logout
 
