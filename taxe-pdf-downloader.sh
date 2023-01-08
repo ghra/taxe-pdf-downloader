@@ -270,12 +270,12 @@ for name in "VAT-7" "ZUS"; do
 done
 
 output_fname="$YEAR_MONTH taxe - VAT Sprzedaz.pdf"
-do_post "/dev/null" "/rejestryVAT/" "${dates_from_to}"
+do_post "/dev/null" "/rejestryVAT/sprzedaz/?tab=sprzedazVAT" "${dates_from_to}"
 do_request "$output_fname" "/rejestryVAT/sprzedaz/pdf"
 assert_file_is_pdf "$output_fname"
 
 output_fname="$YEAR_MONTH taxe - VAT Zakupy.pdf"
-do_post "/dev/null" "/rejestryVAT/" "${dates_from_to}"
+do_post "/dev/null" "/rejestryVAT/zakupy?tab=zakupyVAT" "${dates_from_to}"
 do_request "$output_fname" "/rejestryVAT/zakupy/pdf"
 assert_file_is_pdf "$output_fname"
 
@@ -286,7 +286,7 @@ assert_file_is_pdf "$output_fname"
 
 output_fname="$YEAR_MONTH taxe - KPiR.pdf"
 do_post "/dev/null" "/kpir/" "dataOd=${YEAR_MONTH}"
-do_request "$output_fname" "/kpir/pdf"
+do_request "$output_fname" "/kpir/?pdf"
 assert_file_is_pdf "$output_fname"
 
 output_fname="$YEAR_MONTH taxe - ewidencja srodkow trwalych.pdf"
