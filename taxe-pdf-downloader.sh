@@ -15,6 +15,26 @@ check_system_requirements() {
 }
 
 
+month_name_in_pl() {
+	# WTF? `date +%B` should do the work, but it doesn't in Polish:
+	# here we need a plain name, like "styczeń" or "luty",
+	# but `date` can only return "stycznia" or "lutego" as in a properly spoken date
+	case "$1" in
+		01) echo "styczeń" ;;
+		02) echo "luty" ;;
+		03) echo "marzec" ;;
+		04) echo "kwiecień" ;;
+		05) echo "maj" ;;
+		06) echo "czerwiec" ;;
+		07) echo "lipiec" ;;
+		08) echo "sierpień" ;;
+		09) echo "wrzesień" ;;
+		10) echo "październik" ;;
+		11) echo "listopad" ;;
+		12) echo "grudzień" ;;
+	esac
+}
+
 convert_html_to_pdf() {
 	html_file="$1"
 	pdf_file="$2"
@@ -163,6 +183,8 @@ LAST_DAY="2001-01-31"
 
 YEAR_MONTH="$1"
 YEAR=`echo "${YEAR_MONTH}" | cut -d '-' -f 1`
+MONTH=`echo "${YEAR_MONTH}" | cut -d '-' -f 2`
+YEAR_PL_MONTH="`month_name_in_pl $MONTH` $YEAR"
 FIRST_DAY=`date -d "${YEAR_MONTH}-01" "+%Y-%m-%d" 2>/dev/null`
 if [[ $? != 0 ]]; then
 	show_usage_and_exit "$0"
@@ -207,14 +229,42 @@ for id2reg in $id2reg_list; do
 	assert_file_is_pdf "$output_fname"
 done
 
-do_request "${tmp_raporty_list}" "/raporty/wszystkie/?tab=all"
-for name in "PIT-5L" "VAT-7" "ZUS"; do
+# OR
+do_request "${tmp_raporty_list}" "/reports/?tab=all"
+pit_missed=""
+pit_found=""
+for name in "PIT-5L" "PPE"; do
 	output_fname="$YEAR_MONTH taxe - Raport ${name}.pdf"
-	pdf_url=`cat ${tmp_raporty_list} | tr -d '\n' | sed 's/<h3/\n&/g' | sed -n "s#^.*\<${name}\>.*\<za:.*\<${YEAR_MONTH}\>.*\(/raporty/pdf/[0-9]*\).*\\$#\1#p"`
-	if [[ -z "${pdf_url}" ]]; then
+	report_id=`cat "${tmp_raporty_list}" \
+		| tr -d '\n' \
+		| sed 's/report-header-/\n/g' \
+		| sed -n "s#^\([0-9]*\).*\<${name}\>.*\<${YEAR_PL_MONTH}\>.*\\$#\1#p"`
+	if [[ -z "${report_id}" ]]; then
+		pit_missed+=" $name"
+		continue
+	fi
+	pdf_url="/reports/pdf/$report_id"
+	do_request "${output_fname}" "${pdf_url}"
+	assert_file_is_pdf "$output_fname"
+	pit_found="$name"
+done
+if [[ -z "$pit_found" ]]; then
+	errors+=("'${output_fname}' FAILED: cannot find any of${pit_missed}!")
+fi
+
+# AND
+do_request "${tmp_raporty_list}" "/reports/?tab=all"
+for name in "VAT-7" "ZUS"; do
+	output_fname="$YEAR_MONTH taxe - Raport ${name}.pdf"
+	report_id=`cat "${tmp_raporty_list}" \
+		| tr -d '\n' \
+		| sed 's/report-header-/\n/g' \
+		| sed -n "s#^\([0-9]*\).*\<${name}\>.*\<${YEAR_PL_MONTH}\>.*\\$#\1#p"`
+	if [[ -z "${report_id}" ]]; then
 		errors+=("'${output_fname}' FAILED: cannot find '${name}' id !")
 		continue
 	fi
+	pdf_url="/reports/pdf/$report_id"
 	do_request "${output_fname}" "${pdf_url}"
 	assert_file_is_pdf "$output_fname"
 done
